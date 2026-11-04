@@ -10,6 +10,7 @@ interface MontageJob {
   status: string;
   error?: string;
   updatedAt: string;
+  settledAt?: string;
   spendUsd?: number;
 }
 
@@ -36,6 +37,7 @@ export async function montageStudio(cfg: CheckConfig): Promise<Probe> {
   ]);
   const now = Date.now();
   const age = (j: MontageJob) => now - Date.parse(j.updatedAt);
+  const settledAge = (j: MontageJob) => now - Date.parse(j.settledAt ?? j.updatedAt);
   const stuckMs = Number(cfg.stuckHours ?? 6) * 3600_000;
   const ops: OpsRow[] = [];
   const warnings: string[] = [];
@@ -62,8 +64,8 @@ export async function montageStudio(cfg: CheckConfig): Promise<Probe> {
       label,
       inFlight: inFlight.length,
       awaiting: jobs.filter((j) => j.status === "delivered").length,
-      settled1d: jobs.filter((j) => j.status === "settled" && age(j) < DAY).length,
-      settled7d: jobs.filter((j) => j.status === "settled" && age(j) < 7 * DAY).length,
+      settled1d: jobs.filter((j) => j.status === "settled" && settledAge(j) < DAY).length,
+      settled7d: jobs.filter((j) => j.status === "settled" && settledAge(j) < 7 * DAY).length,
       failed1d: failed1d.length,
       note: notes.join("，") || undefined,
     });

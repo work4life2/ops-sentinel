@@ -9,6 +9,7 @@ interface JevJob {
   price?: string;
   currency?: string;
   updatedAt: string;
+  settledAt?: string;
 }
 
 const DAY = 86_400_000;
@@ -34,8 +35,9 @@ export async function jevFcBuddy(cfg: CheckConfig): Promise<Probe> {
 
   const now = Date.now();
   const within = (j: JevJob, ms: number) => now - Date.parse(j.updatedAt) < ms;
-  const paid = (j: JevJob) => j.status === "delivered" || j.status === "settled";
-  const settled7d = jobs.filter((j) => j.status === "settled" && within(j, 7 * DAY));
+  // settledAt since jev's reconcile fix; updatedAt is the fallback for older jobs (jev never prunes).
+  const settledWithin = (j: JevJob, ms: number) => j.status === "settled" && now - Date.parse(j.settledAt ?? j.updatedAt) < ms;
+  const settled7d = jobs.filter((j) => settledWithin(j, 7 * DAY));
   const warnings: string[] = [];
   const disputed = jobs.filter((j) => j.status === "disputed");
   if (disputed.length) warnings.push(`FC 游戏搭子有 ${disputed.length} 单在争议中：${disputed.map((j) => j.orderId).join("、")}`);
@@ -45,9 +47,9 @@ export async function jevFcBuddy(cfg: CheckConfig): Promise<Probe> {
     label: String(cfg.label ?? "FC 游戏搭子"),
     inFlight: jobs.filter((j) => ["accepting", "minting", "delivering"].includes(j.status)).length,
     awaiting: jobs.filter((j) => j.status === "delivered").length,
-    settled1d: jobs.filter((j) => j.status === "settled" && within(j, DAY)).length,
+    settled1d: jobs.filter((j) => settledWithin(j, DAY)).length,
     settled7d: settled7d.length,
-    revenue7d: jobs.filter((j) => paid(j) && within(j, 7 * DAY)).reduce((sum, j) => sum + (Number(j.price) || 0), 0),
+    revenue7d: jobs.filter((j) => settledWithin(j, 7 * DAY) || (j.status === "delivered" && within(j, 7 * DAY))).reduce((sum, j) => sum + (Number(j.price) || 0), 0),
     currency,
     // Failures from the 10-26 bot flood are old; only fresh ones matter here.
     failed1d: jobs.filter((j) => j.status === "failed" && within(j, DAY)).length,
