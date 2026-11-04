@@ -8,6 +8,7 @@ import { NotConfiguredError, type CheckConfig, type Probe } from "../types.js";
  * organizationId / customerId from admin.mobula.io → settings). Mobula does not report a balance, so
  * remaining = `monthlyCredits` (the plan: Startup 125k, Growth 1.25M) − used since `billingDay`.
  * Past the allowance Mobula bills overage automatically, which is why this is worth an alert.
+ * The usage call itself costs a credit, so give this check a "minIntervalMinutes" (60 in ops.config.json).
  */
 export async function mobula(cfg: CheckConfig): Promise<Probe> {
   const base = (setting(cfg, "baseUrl", true) ?? "https://api.mobula.io/api").replace(/\/+$/, "");
@@ -19,7 +20,8 @@ export async function mobula(cfg: CheckConfig): Promise<Probe> {
   if (!Number.isFinite(monthly) || monthly <= 0) throw new NotConfiguredError("monthlyCredits 要填套餐每月额度");
 
   const from = periodStart(new Date(), Number(setting(cfg, "billingDay", true) ?? 1));
-  const qs = new URLSearchParams({ source: "api", apiKey, from: from.toISOString(), limit: "1" });
+  // 100 hourly rows (newest first) is enough to find the last real use within idleWarnHours.
+  const qs = new URLSearchParams({ source: "api", apiKey, from: from.toISOString(), limit: "100" });
   if (organizationId) qs.set("organizationId", organizationId);
   else qs.set("customerId", customerId!);
   const res = await fetchJson(`${base}/2/usage?${qs}`, { headers: { authorization: apiKey } });
@@ -29,8 +31,10 @@ export async function mobula(cfg: CheckConfig): Promise<Probe> {
   if (used === undefined) throw new Error("返回里没有 data.totals.credits");
   const calls = pickNumber(res, "data.totals.requestCalls");
   const left = monthly - used;
-  // Rows are hourly and newest-first; limit=1 gives the last hour with any usage.
-  const lastAt = res?.data?.rows?.[0]?.timestamp as string | undefined;
+  // Our own monitoring calls are billed and counted too; the last *real* use is the newest hour with
+  // any other endpoint.
+  const rows = (res?.data?.rows ?? []) as { timestamp: string; metrics?: Record<string, number> }[];
+  const lastAt = rows.find((r) => Object.keys(r.metrics ?? {}).some((m) => !MONITORING.has(m.replace(/:calls$/, ""))))?.timestamp;
   const idleHours = Number(setting(cfg, "idleWarnHours", true) ?? 48);
   const days = Math.max(1, (Date.now() - from.getTime()) / 86_400_000);
   const note = [
@@ -46,6 +50,9 @@ export async function mobula(cfg: CheckConfig): Promise<Probe> {
   }
   return { metric: { value: left, limit: monthly, unit: "credits" }, note, warnings };
 }
+
+/** Endpoints this check (and its token probe) call: they cost credits but are not real usage. */
+const MONITORING = new Set(["/api/2/usage", "/api/2/auth/tokens"]);
 
 /** Start of the current billing period, given the day of month it renews on (UTC). */
 export function periodStart(now: Date, billingDay: number): Date {

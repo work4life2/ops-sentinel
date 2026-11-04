@@ -1,4 +1,4 @@
-import { CHECKS } from "./checks/index.js";
+import { CHECKS, type CheckFn } from "./checks/index.js";
 import { amount, clock } from "./format.js";
 import { AuthError, NotConfiguredError, type CheckConfig, type CheckResult, type Config, type Level, type Metric, type ServiceConfig, type Threshold } from "./types.js";
 
@@ -26,6 +26,9 @@ function fmtThreshold(t: Threshold | undefined, metric: Metric): string | undefi
   const abs = resolveThreshold(t, metric.limit);
   return abs === undefined ? t : `${amount(abs, metric.unit)} (${t})`;
 }
+
+/** Last result per check, reused while younger than the check's minIntervalMinutes (paid endpoints). */
+const lastResults = new Map<string, CheckResult>();
 
 export function checkKey(serviceId: string, checkId: string): string {
   return `${serviceId}/${checkId}`;
@@ -66,6 +69,20 @@ export async function runCheck(
   const fn = CHECKS[check.kind];
   if (!fn) return done({ level: "error", headline: `未知的检查类型 ${check.kind}` });
 
+  const key = checkKey(service.id, check.id);
+  const minMs = Number(check.minIntervalMinutes ?? 0) * 60_000;
+  const cached = lastResults.get(key);
+  if (minMs > 0 && cached && cached.level !== "error" && Date.now() - Date.parse(cached.at) < minMs) return cached;
+  const result = await runProbe(check, fn, done);
+  lastResults.set(key, result);
+  return result;
+}
+
+async function runProbe(
+  check: CheckConfig,
+  fn: CheckFn,
+  done: (r: Partial<CheckResult> & { level: Level; headline: string }) => CheckResult,
+): Promise<CheckResult> {
   try {
     const probe = await fn(check);
     const metric = probe.metric;

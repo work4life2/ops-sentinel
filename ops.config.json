@@ -119,6 +119,7 @@
           "kind": "mobula",
           "_comment": "Termix 后端的行情 K 线和 token logo 用。额度 = 套餐每月 credits − 本期已用；超出后 Mobula 自动按量计费。",
           "name": "本期 credits",
+          "minIntervalMinutes": 60,
           "apiKey": "${MOBULA_API_KEY}",
           "organizationId": "${MOBULA_ORGANIZATION_ID}",
           "customerId": "${MOBULA_CUSTOMER_ID}",

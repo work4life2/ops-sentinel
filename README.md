@@ -66,6 +66,8 @@ npm test                         # 阈值 / 告警状态机 / 命令解析的单
 
 单个检查项可以用 `alertAfter` 设连续几次异常才报警。`http-health` 默认是 2，用来过滤偶发的抖动。
 
+查询本身要收费的接口（例如 Mobula 的用量接口，每次 1 credit），可以加 `minIntervalMinutes`：在这个间隔内直接复用上次的结果，`/ops` 也一样。Mobula 设的是 60，每月约 720 credits。
+
 ### 检查类型（kind）
 
 | kind | 用途 | 关键参数 |

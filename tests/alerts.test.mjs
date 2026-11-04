@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { evaluate, initialState } from "../dist/alerts.js";
 import { parseCommand } from "../dist/commands.js";
-import { levelFor, resolveThreshold } from "../dist/runner.js";
+import { CHECKS } from "../dist/checks/index.js";
+import { levelFor, resolveThreshold, runCheck } from "../dist/runner.js";
 
 const HOUR = 3600_000;
 const opts = (now, extra = {}) => ({ now, alertAfter: 1, failuresBeforeAlert: 3, remindMs: 6 * HOUR, authBackoffMs: 6 * HOUR, ...extra });
@@ -94,4 +95,21 @@ test("command parsing", () => {
   assert.deepEqual(parseCommand("help", config), { type: "help" });
   assert.deepEqual(parseCommand("list", config), { type: "list" });
   assert.equal(parseCommand("blah", config).type, "unknown");
+});
+
+test("minIntervalMinutes reuses the last result (paid endpoints are not re-queried)", async () => {
+  let calls = 0;
+  CHECKS["test-paid"] = async () => ({ metric: { value: 100 + ++calls, unit: "credits" } });
+  const service = { id: "s", name: "S", checks: [] };
+  const opts = { timezone: "Asia/Shanghai" };
+  const cached = { id: "paid", kind: "test-paid", name: "P", minIntervalMinutes: 60 };
+  const a = await runCheck(service, cached, opts);
+  const b = await runCheck(service, cached, opts);
+  assert.equal(calls, 1);
+  assert.equal(b.metric.value, a.metric.value);
+  const fresh = { id: "free", kind: "test-paid", name: "F" };
+  await runCheck(service, fresh, opts);
+  await runCheck(service, fresh, opts);
+  assert.equal(calls, 3);
+  delete CHECKS["test-paid"];
 });
