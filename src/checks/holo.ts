@@ -10,6 +10,18 @@ interface HoloJob {
   createdAt: string;
   updatedAt: string;
   error?: string;
+  prunedAt?: string;
+  settledAt?: string;
+}
+
+/**
+ * When a job settled. holo records settledAt since e00e34a; for older jobs updatedAt is the best guess,
+ * except when it is the prune time (prune bumps updatedAt), which would make an old settlement look new.
+ */
+export function settledTime(j: { updatedAt: string; prunedAt?: string; settledAt?: string }): number | undefined {
+  if (j.settledAt) return Date.parse(j.settledAt);
+  if (j.prunedAt && j.prunedAt === j.updatedAt) return undefined;
+  return Date.parse(j.updatedAt);
 }
 
 const IN_FLIGHT = new Set(["accepting", "building", "built", "delivering"]);
@@ -34,8 +46,12 @@ export async function holoCardAgent(cfg: CheckConfig): Promise<Probe> {
   const inFlight = orders.filter((j) => IN_FLIGHT.has(j.status));
   const queued = orders.filter((j) => j.status === "queued" && within(j, DAY));
   const awaiting = orders.filter((j) => j.status === "delivered");
-  const settled1d = orders.filter((j) => j.status === "settled" && within(j, DAY));
-  const settled7d = orders.filter((j) => j.status === "settled" && within(j, 7 * DAY));
+  const settledWithin = (j: HoloJob, ms: number) => {
+    const t = j.status === "settled" ? settledTime(j) : undefined;
+    return t !== undefined && now - t < ms;
+  };
+  const settled1d = orders.filter((j) => settledWithin(j, DAY));
+  const settled7d = orders.filter((j) => settledWithin(j, 7 * DAY));
   const failed1d = orders.filter((j) => j.status === "failed" && within(j, DAY));
 
   const price = Number(status?.service?.price ?? 0);

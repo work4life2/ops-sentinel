@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { settledTime } from "../dist/checks/holo.js";
 import { periodStart } from "../dist/checks/mobula.js";
 import { alertMessage, summaryMessage, summaryPlain } from "../dist/report.js";
 
@@ -89,4 +90,12 @@ test("mobula billing period", () => {
   assert.equal(periodStart(new Date("2026-11-25T00:00:00Z"), 20).toISOString(), "2026-11-20T00:00:00.000Z");
   assert.equal(periodStart(new Date("2026-01-05T00:00:00Z"), 20).toISOString(), "2025-12-20T00:00:00.000Z");
   assert.equal(periodStart(new Date("2026-11-04T00:00:00Z"), 1).toISOString(), "2026-11-01T00:00:00.000Z");
+});
+
+test("holo settlement time ignores prune bumps", () => {
+  const t = "2026-11-04T00:00:00.000Z";
+  assert.equal(settledTime({ updatedAt: t, settledAt: "2026-10-16T06:02:32.833Z" }), Date.parse("2026-10-16T06:02:32.833Z"));
+  assert.equal(settledTime({ updatedAt: t, prunedAt: t }), undefined); // updatedAt is the prune, not the payout
+  assert.equal(settledTime({ updatedAt: t, prunedAt: "2026-10-01T00:00:00.000Z" }), Date.parse(t));
+  assert.equal(settledTime({ updatedAt: t }), Date.parse(t));
 });
