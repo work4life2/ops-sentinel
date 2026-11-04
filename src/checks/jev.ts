@@ -10,6 +10,7 @@ interface JevJob {
   currency?: string;
   updatedAt: string;
   settledAt?: string;
+  dispute?: { openedAt?: string; evidenceSubmittedAt?: string };
 }
 
 const DAY = 86_400_000;
@@ -22,11 +23,15 @@ const DAY = 86_400_000;
 export async function jevFcBuddy(cfg: CheckConfig): Promise<Probe> {
   const base = setting(cfg, "baseUrl").replace(/\/+$/, "");
   const headers = { authorization: `Bearer ${setting(cfg, "adminToken")}` };
-  const [o, list] = await Promise.all([
+  type OrderList = { orders?: JevJob[] } | JevJob[];
+  const [o, recent, open] = await Promise.all([
     fetchJson(`${base}/api/admin/overview`, { headers, timeoutMs: 20_000 }),
-    fetchJson<{ orders?: JevJob[] } | JevJob[]>(`${base}/api/admin/orders`, { headers, timeoutMs: 20_000 }),
+    fetchJson<OrderList>(`${base}/api/admin/orders`, { headers, timeoutMs: 20_000 }),
+    // The newest 200 alone miss old open orders (the 10-26 bot flood buried an October dispute).
+    fetchJson<OrderList>(`${base}/api/admin/orders?status=disputed,delivered`, { headers, timeoutMs: 20_000 }),
   ]);
-  const jobs: JevJob[] = Array.isArray(list) ? list : (list.orders ?? []);
+  const rows = (l: OrderList) => (Array.isArray(l) ? l : (l.orders ?? []));
+  const jobs: JevJob[] = [...new Map([...rows(recent), ...rows(open)].map((j) => [j.orderId, j])).values()];
 
   const spend = o.spend ?? {};
   const coins = o.coins ?? {};
@@ -40,7 +45,10 @@ export async function jevFcBuddy(cfg: CheckConfig): Promise<Probe> {
   const settled7d = jobs.filter((j) => settledWithin(j, 7 * DAY));
   const warnings: string[] = [];
   const disputed = jobs.filter((j) => j.status === "disputed");
-  if (disputed.length) warnings.push(`FC 游戏搭子有 ${disputed.length} 单在争议中：${disputed.map((j) => j.orderId).join("、")}`);
+  if (disputed.length) {
+    const list = disputed.map((j) => `${j.orderId}（${(j.dispute?.openedAt ?? j.dispute?.evidenceSubmittedAt ?? j.updatedAt).slice(5, 10)} 起）`).join("、");
+    warnings.push(`FC 游戏搭子有 ${disputed.length} 单在争议中，等平台裁决：${list}`);
+  }
   if (o.hosting && !o.hosting.enabled) warnings.push("FC 游戏搭子的 Termix 托管没开，不会接单");
 
   const ops = [{
