@@ -18,7 +18,7 @@ as_user() { runuser -u "$SERVICE_USER" -- env HOME="$TARGET" "$@"; }
 
 cd "$TARGET"
 as_user git fetch -q origin "$BRANCH"
-LOCAL="$(as_user git rev-parse HEAD 2>/dev/null || echo none)"
+LOCAL="$(as_user git rev-parse -q --verify HEAD || echo none)"
 REMOTE="$(as_user git rev-parse "origin/$BRANCH")"
 
 if [ "$LOCAL" = "$REMOTE" ] && [ "$FORCE" = 0 ]; then
