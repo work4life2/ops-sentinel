@@ -1,0 +1,21 @@
+# systemd unit, installed by deploy/install.sh (which also substitutes User=%i → opsbot).
+[Unit]
+Description=ops-sentinel — quota alerts and service summary on Slack
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/ops-sentinel
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/env node dist/index.js serve
+Restart=always
+RestartSec=15
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/ops-sentinel/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

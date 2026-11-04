@@ -1,0 +1,133 @@
+{
+  "_comment": "检查项配置。部署在 Linode 172.104.55.67 上，三个服务都走 127.0.0.1。密钥一律写在 .env.local，这里用 ${变量名} 引用；缺变量的检查显示为“未配置”，不会告警。阈值：数字=绝对值（检查项自身的单位），\"20%\"=占总额的比例。",
+  "intervalMinutes": 10,
+  "remindHours": 6,
+  "failuresBeforeAlert": 3,
+  "timezone": "Asia/Shanghai",
+  "dailySummaryAt": "09:30",
+  "services": [
+    {
+      "id": "3dcardagent",
+      "name": "3D 卡牌",
+      "checks": [
+        { "id": "health", "kind": "http-health", "name": "服务在线", "url": "http://127.0.0.1:8787/health", "okPath": "ok" },
+        {
+          "id": "orders",
+          "kind": "holo-card-agent",
+          "name": "订单流水",
+          "label": "3D 卡牌",
+          "baseUrl": "http://127.0.0.1:8787/${HOLO_DASHBOARD_PATH}",
+          "stuckMinutes": 60,
+          "staleDeliveryDays": 7
+        },
+        {
+          "id": "wallet",
+          "kind": "evm-balance",
+          "name": "热钱包 BNB",
+          "address": "${HOLO_WALLET_ADDRESS}",
+          "warn": 0.0015,
+          "crit": 0.0005
+        }
+      ]
+    },
+    {
+      "id": "jev-fc-buddy",
+      "name": "FC 游戏搭子",
+      "checks": [
+        {
+          "id": "health",
+          "kind": "http-health",
+          "name": "服务在线",
+          "url": "http://127.0.0.1:8790/api/health",
+          "okPath": "ok",
+          "fields": [{ "path": "sessions", "label": "在线局数" }]
+        },
+        {
+          "id": "overview",
+          "kind": "jev-fc-buddy",
+          "name": "OpenRouter 余额",
+          "label": "FC 游戏搭子",
+          "baseUrl": "http://127.0.0.1:8790",
+          "adminToken": "${JEV_ADMIN_TOKEN}",
+          "warn": 5,
+          "crit": 1
+        },
+        {
+          "id": "wallet",
+          "kind": "evm-balance",
+          "name": "热钱包 BNB",
+          "address": "${JEV_WALLET_ADDRESS}",
+          "warn": 0.0015,
+          "crit": 0.0005
+        }
+      ]
+    },
+    {
+      "id": "montage-studio",
+      "name": "Montage Studio",
+      "checks": [
+        { "id": "health", "kind": "http-health", "name": "服务在线", "url": "http://127.0.0.1:8795/health", "okPath": "ok" },
+        { "id": "jobs", "kind": "montage-studio", "name": "订单流水", "baseUrl": "http://127.0.0.1:8795", "stuckHours": 6 },
+        { "id": "wallet-montage", "kind": "evm-balance", "name": "Montage 热钱包 BNB", "address": "${MONTAGE_WALLET_ADDRESS}", "warn": 0.0015, "crit": 0.0005 },
+        { "id": "wallet-renderfarm", "kind": "evm-balance", "name": "RenderFarm 热钱包 BNB", "address": "${RENDERFARM_WALLET_ADDRESS}", "warn": 0.0015, "crit": 0.0005 },
+        { "id": "wallet-beatsmith", "kind": "evm-balance", "name": "Beatsmith 热钱包 BNB", "address": "${BEATSMITH_WALLET_ADDRESS}", "warn": 0.0015, "crit": 0.0005 },
+        { "id": "wallet-sketchboard", "kind": "evm-balance", "name": "Sketchboard 热钱包 BNB", "address": "${SKETCHBOARD_WALLET_ADDRESS}", "warn": 0.0015, "crit": 0.0005 }
+      ]
+    },
+    {
+      "id": "cunai",
+      "name": "cun.ai",
+      "checks": [
+        {
+          "id": "account",
+          "kind": "newapi",
+          "_comment": "3D 卡牌和 Montage（Sketchboard 出图 + 所有角色的 LLM）都走这个账户。账户余额需要控制台的系统访问令牌。",
+          "name": "账户余额",
+          "baseUrl": "https://www.cun.ai",
+          "accessToken": "${CUNAI_ACCESS_TOKEN}",
+          "userId": "${CUNAI_USER_ID}",
+          "apiKey": "${CUNAI_API_KEY}",
+          "warn": 10,
+          "crit": 3
+        }
+      ]
+    },
+    {
+      "id": "runway",
+      "name": "Runway",
+      "checks": [
+        {
+          "id": "credits",
+          "kind": "http-json",
+          "_comment": "Montage 通过 Runway MCP（OAuth）用 Pro 账户的 credits；余额由 Montage 进程自己查（/api/runway/credits），避免两个进程抢着刷新 OAuth token。",
+          "name": "账户 credits",
+          "url": "http://127.0.0.1:8795/api/runway/credits",
+          "remainingPath": "credits",
+          "unit": "credits",
+          "usdPerUnit": 0.0156,
+          "warn": 500,
+          "crit": 150
+        }
+      ]
+    },
+    {
+      "id": "mobula",
+      "name": "Mobula",
+      "checks": [
+        {
+          "id": "credits",
+          "kind": "mobula",
+          "_comment": "Termix 后端的行情 K 线和 token logo 用。额度 = 套餐每月 credits − 本期已用；超出后 Mobula 自动按量计费。",
+          "name": "本期 credits",
+          "apiKey": "${MOBULA_API_KEY}",
+          "organizationId": "${MOBULA_ORGANIZATION_ID}",
+          "customerId": "${MOBULA_CUSTOMER_ID}",
+          "monthlyCredits": "${MOBULA_MONTHLY_CREDITS}",
+          "billingDay": "${MOBULA_BILLING_DAY}",
+          "warn": "20%",
+          "crit": "5%"
+        }
+      ]
+    }
+  ]
+}

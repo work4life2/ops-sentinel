@@ -1,0 +1,35 @@
+# api.slack.com/apps → Create New App → From a manifest → 选工作区 → 粘贴本文件。
+display_information:
+  name: ops-sentinel
+  description: 配额告警 + 服务状态汇总
+  background_color: "#1f2937"
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: ops-sentinel
+    always_online: true
+  slash_commands:
+    - command: /ops
+      description: 汇总所有服务的配额和运行状态
+      usage_hint: "[总结 | 服务id | list | help]"
+      should_escape: false
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - commands
+      - app_mentions:read
+      - im:history
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_mention
+      - message.im
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

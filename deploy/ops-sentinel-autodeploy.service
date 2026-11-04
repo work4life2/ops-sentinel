@@ -1,0 +1,11 @@
+# Redeploys when origin/main moves. Triggered by ops-sentinel-autodeploy.timer (every minute).
+[Unit]
+Description=ops-sentinel — pull origin/main and redeploy if it changed
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ops-sentinel
+ExecStart=/bin/bash /opt/ops-sentinel/deploy/deploy.sh
+TimeoutStartSec=600
