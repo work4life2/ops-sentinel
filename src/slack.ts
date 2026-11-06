@@ -50,7 +50,19 @@ export function createBot(deps: BotDeps): Bot {
     await ack({ response_type: "ephemeral", text: "正在检查，稍等…" });
     try {
       const reply = await answer(c.text ?? "", c.user_id);
-      await respond({ response_type: "in_channel", replace_original: false, ...reply });
+      // Post as the bot so everyone in the channel sees it; response_url replies can stay
+      // "only visible to you". Fall back to response_url where the bot is not a member.
+      try {
+        await app.client.chat.postMessage({
+          channel: c.channel_id,
+          text: reply.text,
+          blocks: reply.blocks as never,
+          unfurl_links: false,
+        });
+      } catch (err) {
+        deps.log(`[slack] postMessage to ${c.channel_id} failed (${(err as Error).message}), using response_url`);
+        await respond({ response_type: "in_channel", replace_original: false, ...reply });
+      }
     } catch (err) {
       await respond({ response_type: "ephemeral", text: `出错了：${(err as Error).message}` });
     }
