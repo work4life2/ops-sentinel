@@ -61,7 +61,7 @@ npm test                         # 阈值 / 告警状态机 / 命令解析的单
 - `intervalMinutes`：检查间隔，默认 10。
 - `remindHours`：问题没解决时的重复提醒间隔，默认 6。
 - `failuresBeforeAlert`：接口连续查失败几次才告警，默认 3。
-- `dailySummaryAt`：每日汇总的时间。
+- `dailySummaryAt`：每日汇总的时间（如 `"09:30"`）。不写就不发；目前已关闭，需要时用 `/ops` 手动看。
 - `timezone`：时区。
 
 单个检查项可以用 `alertAfter` 设连续几次异常才报警。`http-health` 默认是 2，用来过滤偶发的抖动。
@@ -117,7 +117,7 @@ cd /opt/ops-sentinel && runuser -u opsbot -- env HOME=/opt/ops-sentinel node dis
 
 ### 注意事项
 
-- **和被监控的服务在同一台机器上**：机器整个挂掉时，监控也跟着挂，不会有告警。每日汇总就是心跳：哪天 09:30 没收到，就去看一眼。
+- **和被监控的服务在同一台机器上**：机器整个挂掉时，监控也跟着挂，不会有告警。每日汇总已关闭，所以没有心跳了：想确认它还活着，就在 Slack 里发一次 `/ops`；要恢复心跳，在配置里加回 `dailySummaryAt`。
 - 三个服务都只监听 127.0.0.1，ops-sentinel 直接走本机访问，不经过 nginx / fail2ban。
 - **凭据错了不会一直重试**：收到 401/403 时立即告警，并暂停这项检查 6 小时。这样做是为了避免 jev 那边的 fail2ban 把监控机的 IP 封掉。改好 `.env.local` 后重启 ops-sentinel，暂停会立即解除。
 - **代理**：程序本身不读代理配置。本地调试时如果需要代理，`check` 可以临时加 `NODE_USE_ENV_PROXY=1 HTTPS_PROXY=…`。但只要加载了 Slack 模块（`serve`），Bolt 就会替换全局 fetch 的 dispatcher，这个代理方式会失效，所以 `serve` 请在能直连的服务器上跑。

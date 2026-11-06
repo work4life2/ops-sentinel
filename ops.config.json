@@ -4,7 +4,6 @@
   "remindHours": 6,
   "failuresBeforeAlert": 3,
   "timezone": "Asia/Shanghai",
-  "dailySummaryAt": "09:30",
   "services": [
     {
       "id": "3dcardagent",
